@@ -11,10 +11,12 @@ st.set_page_config(page_title="STRIDE: 3D Readiness Surface Viewer", layout="wid
 
 @st.cache_data
 def load_data():
-    return pd.read_csv("Expanded_Readiness_Spreadsheet.csv")
+    df = pd.read_csv("Expanded_Readiness_Spreadsheet.csv")
+    df.columns = df.columns.str.strip()  # Strip whitespace from column names
+    return df
 
 df = load_data()
-st.write("📋 Available columns:", df.columns.tolist())  # Debugging output
+st.write("📋 Available columns:", df.columns.tolist())  # Debug output
 
 st.title("📊 STRIDE: 3D Readiness Surface Viewer (Artificial Data)")
 st.markdown("Explore linear vs curved surface relationships between readiness and contributing factors.")
