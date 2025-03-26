@@ -83,7 +83,7 @@ for xi, yi, zi, color in zip(X_pair[x_feature], X_pair[y_feature], Z_pred, color
     ))
 
 # Layout
-fig.update_layout(
+fig.update_layout(height=800,  # 🆙 Taller display area
     title=f"3D Readiness Surface: {x_feature} vs {y_feature} | R²={r2_val:.2f}",
     scene=dict(
         xaxis_title=x_feature, yaxis_title=y_feature, zaxis_title="Predicted Readiness",
