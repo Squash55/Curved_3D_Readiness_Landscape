@@ -85,7 +85,7 @@ for xi, yi, zi, color in zip(X_pair[x_feature], X_pair[y_feature], Z_pred, color
 # Layout
 fig.update_layout(
     title=f"3D Linear Readiness Surface: {x_feature} vs {y_feature} | R²={r2_val:.2f}",
-    height=800,
+    height=800, width=1200,  # 👈 Wider than default
     scene=dict(
         xaxis_title=x_feature,
         yaxis_title=y_feature,
