@@ -1,102 +1,89 @@
 
 import streamlit as st
 import pandas as pd
+import plotly.graph_objs as go
 import numpy as np
-import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import r2_score
-from itertools import combinations
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
-st.set_page_config(page_title="3D Linear Readiness Surface", layout="wide")
+st.set_page_config(page_title="STRIDE: 3D Readiness Surface Viewer", layout="wide")
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("Expanded_Readiness_Spreadsheet.csv")
-    features = [
-        "Mission Complexity", "Maintenance Burden", "Personnel Gaps", "Logistics Readiness",
-        "Equipment Availability", "Cyber Resilience", "Fuel Supply Score", "Flight Ops Readiness",
-        "Medical Support Score", "Training Level"
-    ]
-    for col in features:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df.dropna(subset=features)
-    return df, features
+    return pd.read_csv("Expanded_Readiness_Spreadsheet.csv")
 
-df, features = load_data()
-y = np.random.normal(75, 10, len(df))
+df = load_data()
 
-# Calculate R² for all feature pairs
-pair_scores = []
-for x_feat, y_feat in combinations(features, 2):
+st.title("📊 STRIDE: 3D Readiness Surface Viewer (Artificial Data)")
+st.markdown("Explore linear vs curved surface relationships between readiness and contributing factors.")
+
+x_col = st.selectbox("Select X-axis variable", df.columns[1:-1], index=0)
+y_col = st.selectbox("Select Y-axis variable", df.columns[1:-1], index=1)
+z_col = "Readiness"
+
+# New toggle for surface type
+surface_type = st.radio("Select surface type:", ["Linear 3D Surface", "Curved 3D Surface"])
+
+# Prepare data
+x = df[x_col].values
+y = df[y_col].values
+z = df[z_col].values
+X = np.column_stack((x, y))
+
+# Model selection
+if surface_type == "Linear 3D Surface":
     model = LinearRegression()
-    model.fit(df[[x_feat, y_feat]], y)
-    r2 = r2_score(y, model.predict(df[[x_feat, y_feat]]))
-    pair_scores.append((x_feat, y_feat, r2))
+    model.fit(X, z)
+    z_pred = model.predict(X)
+    rsq = model.score(X, z)
+else:
+    model = make_pipeline(PolynomialFeatures(degree=2), LinearRegression())
+    model.fit(X, z)
+    z_pred = model.predict(X)
+    rsq = model.score(X, z)
 
-pair_scores = sorted(pair_scores, key=lambda x: x[2], reverse=True)
-pair_dict = {f"{x} vs {y} (R²={r2:.2f})": (x, y) for x, y, r2 in pair_scores}
-
-# Sidebar controls
-st.sidebar.header("🧭 Feature Pair Selection")
-selected_label = st.sidebar.selectbox("Select Feature Pair", list(pair_dict.keys()))
-x_feature, y_feature = pair_dict[selected_label]
-smoothness = st.sidebar.slider("Surface Smoothness", 10, 60, 30)
-
-# Train model
-X_pair = df[[x_feature, y_feature]]
-model = LinearRegression()
-model.fit(X_pair, y)
-Z_pred = model.predict(X_pair)
-r2_val = r2_score(y, Z_pred)
-
-# Build surface grid
-x_range = np.linspace(X_pair[x_feature].min(), X_pair[x_feature].max(), smoothness)
-y_range = np.linspace(X_pair[y_feature].min(), X_pair[y_feature].max(), smoothness)
+# Surface grid
+grid_size = 30
+x_range = np.linspace(x.min(), x.max(), grid_size)
+y_range = np.linspace(y.min(), y.max(), grid_size)
 xx, yy = np.meshgrid(x_range, y_range)
-grid_df = pd.DataFrame({x_feature: xx.ravel(), y_feature: yy.ravel()})
-zz = model.predict(grid_df).reshape(xx.shape)
+grid = np.column_stack((xx.ravel(), yy.ravel()))
+zz = model.predict(grid).reshape(xx.shape)
 
-# Pin colors
-colors = ['red' if val < 70 else 'blue' if val < 85 else 'green' for val in Z_pred]
-
-# Plotly 3D plot
+# 3D plot
 fig = go.Figure()
 
-# Add linear surface
-fig.add_trace(go.Surface(x=xx, y=yy, z=zz, opacity=0.85, showscale=False))
+fig.add_trace(go.Surface(
+    x=xx, y=yy, z=zz,
+    colorscale="Viridis", opacity=0.8, showscale=True,
+    contours={"z": {"show": True, "usecolormap": True, "project_z": True}},
+))
 
-# Scatter points
+color_scale = np.interp(z, (min(z), max(z)), (0, 1))
+colors = [f"rgb({int((1 - val) * 255)}, {int(val * 255)}, 150)" for val in color_scale]
+
 fig.add_trace(go.Scatter3d(
-    x=X_pair[x_feature], y=X_pair[y_feature], z=Z_pred,
-    mode='markers', marker=dict(size=5, color=colors),
-    name="Bases", text=[f"{x_feature}: {a}, {y_feature}: {b}, Readiness: {c:.1f}"
-                        for a, b, c in zip(X_pair[x_feature], X_pair[y_feature], Z_pred)],
+    x=x, y=y, z=z,
+    mode="markers+lines",
+    marker=dict(size=5, color=colors),
+    line=dict(color="gray", width=1),
+    hovertext=[f"{x_col}: {a:.1f}<br>{y_col}: {b:.1f}<br>{z_col}: {c:.1f}" for a, b, c in zip(x, y, z)],
     hoverinfo="text"
 ))
 
-# Pin lines
-for xi, yi, zi, color in zip(X_pair[x_feature], X_pair[y_feature], Z_pred, colors):
-    fig.add_trace(go.Scatter3d(
-        x=[xi, xi], y=[yi, yi], z=[0, zi],
-        mode='lines', line=dict(color=color, width=2),
-        showlegend=False
-    ))
-
-# Layout
 fig.update_layout(
-    title=f"3D Linear Readiness Surface: {x_feature} vs {y_feature} | R²={r2_val:.2f}",
-    height=800, width=1200,  # 👈 Wider than default
     scene=dict(
-        xaxis_title=x_feature,
-        yaxis_title=y_feature,
-        zaxis_title="Predicted Readiness",
-        xaxis=dict(showgrid=True, gridcolor='white'),
-        yaxis=dict(showgrid=True, gridcolor='white'),
-        zaxis=dict(showgrid=True, gridcolor='white'),
+        xaxis_title=x_col,
+        yaxis_title=y_col,
+        zaxis_title=z_col,
+        xaxis=dict(showgrid=True, gridcolor="white"),
+        yaxis=dict(showgrid=True, gridcolor="white"),
+        zaxis=dict(showgrid=True, gridcolor="white")
     ),
-    margin=dict(l=0, r=0, b=0, t=60)
+    margin=dict(l=0, r=0, b=0, t=30),
+    height=700,
+    title=f"3D Readiness Surface ({surface_type}) — R²: {rsq:.2f}"
 )
 
-# Render
-st.title("📊 3D Linear Readiness Surface")
 st.plotly_chart(fig, use_container_width=True)
