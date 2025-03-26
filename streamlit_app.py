@@ -7,7 +7,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
-st.set_page_config(page_title="STRIDE: 3D Readiness Surface Viewer", layout="wide")
+st.set_page_config(page_title="3D Readiness Surface Viewer", layout="wide")
 
 @st.cache_data
 def load_data():
@@ -18,7 +18,7 @@ def load_data():
 df = load_data()
 st.write("📋 Available columns:", df.columns.tolist())  # Debug output
 
-st.title("📊 STRIDE: 3D Readiness Surface Viewer (Artificial Data)")
+st.title("📊 3D Readiness Surface Viewer (Artificial Data)")
 st.markdown("Explore linear vs curved surface relationships between readiness and contributing factors.")
 
 # Select only numeric columns for X and Y
