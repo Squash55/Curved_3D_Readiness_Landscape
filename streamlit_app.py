@@ -14,15 +14,21 @@ def load_data():
     return pd.read_csv("Expanded_Readiness_Spreadsheet.csv")
 
 df = load_data()
+st.write("📋 Available columns:", df.columns.tolist())  # Debugging output
 
 st.title("📊 STRIDE: 3D Readiness Surface Viewer (Artificial Data)")
 st.markdown("Explore linear vs curved surface relationships between readiness and contributing factors.")
 
-x_col = st.selectbox("Select X-axis variable", df.columns[1:-1], index=0)
-y_col = st.selectbox("Select Y-axis variable", df.columns[1:-1], index=1)
+# Select only numeric columns for X and Y
+numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns.tolist()
+if "Readiness" in numeric_cols:
+    numeric_cols.remove("Readiness")
+
+x_col = st.selectbox("Select X-axis variable", numeric_cols, index=0)
+y_col = st.selectbox("Select Y-axis variable", numeric_cols, index=1)
 z_col = "Readiness"
 
-# New toggle for surface type
+# Surface type toggle
 surface_type = st.radio("Select surface type:", ["Linear 3D Surface", "Curved 3D Surface"])
 
 # Prepare data
@@ -31,17 +37,14 @@ y = df[y_col].values
 z = df[z_col].values
 X = np.column_stack((x, y))
 
-# Model selection
+# Fit model
 if surface_type == "Linear 3D Surface":
     model = LinearRegression()
-    model.fit(X, z)
-    z_pred = model.predict(X)
-    rsq = model.score(X, z)
 else:
     model = make_pipeline(PolynomialFeatures(degree=2), LinearRegression())
-    model.fit(X, z)
-    z_pred = model.predict(X)
-    rsq = model.score(X, z)
+model.fit(X, z)
+z_pred = model.predict(X)
+rsq = model.score(X, z)
 
 # Surface grid
 grid_size = 30
